@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Pulse</title>
+    <meta name="theme-color" content="#0f0f1a">
+    <meta name="description" content="Train your brain. Beat the rot.">
+  <!-- Add these lines inside the <head> tag of index.html -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0f0f1a">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(registration => console.log('ServiceWorker registered'))
+        .catch(err => console.log('ServiceWorker failed: ', err));
+    });
+  }
+</script>
+
+
+    <style>
+        :root {
+            --bg-color: #0f0f1a;
+            --grid-bg: #1a1a2e;
+            --tile-off: #2a2a40;
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-green: #00ff66;
+            --text-color: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Courier New', Courier, monospace; /* Fallback for retro feel */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- UI Elements --- */
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        .level-display {
+            font-size: 1.2rem;
+            color: var(--neon-pink);
+            margin-top: 10px;
+            text-shadow: 0 0 5px var(--neon-pink);
+        }
+
+        /* --- The Grid --- */
+        .game-container {
+            position: relative;
+            width: 90vw;
+            max-width: 400px;
+            aspect-ratio: 1;
+            padding: 10px;
+            background: var(--grid-bg);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            height: 100%;
+        }
+
+        .tile {
+            background-color: var(--tile-off);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tile:active {
+            transform: scale(0.95);
+        }
+
+        /* Flash Animation Class */
+        .tile.active {
+            background-color: var(--neon-cyan);
+            box-shadow: 0 0 15px var(--neon-cyan), inset 0 0 10px white;
+        }
+
+        .tile.success {
+            background-color: var(--neon-green);
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+
+        .tile.error {
+            background-color: var(--neon-pink);
+            box-shadow: 0 0 15px var(--neon-pink);
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* --- Overlays & Modals --- */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 15, 26, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15px;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .btn {
+            background: transparent;
+            color: var(--neon-cyan);
+            border: 2px solid var(--neon-cyan);
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-family: inherit;
+            text-transform: uppercase;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+
+        .btn:hover {
+            background: var(--neon-cyan);
+            color: var(--bg-color);
+            box-shadow: 0 0 20px var(--neon-cyan);
+        }
+
+        .btn-share {
+            border-color: var(--neon-pink);
+            color: var(--neon-pink);
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.2);
+        }
+
+        .btn-share:hover {
+            background: var(--neon-pink);
+            color: white;
+            box-shadow: 0 0 20px var(--neon-pink);
+        }
+
+        .message {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-align: center;
+            color: white;
+        }
+
+        /* Canvas for generating images (hidden) */
+        #shareCanvas {
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>PIXEL PULSE</h1>
+        <div class="level-display">LEVEL <span id="level-count">1</span></div>
+    </header>
+
+    <div class="game-container">
+        <div class="grid" id="grid">
+            <!-- Tiles generated by JS -->
+        </div>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="overlay">
+            <div class="message">MEMORIZE THE PULSE</div>
+            <button class="btn" onclick="startGame()">START</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="overlay hidden">
+            <div class="message" style="color: var(--neon-pink)">SYSTEM FAILURE</div>
+            <div class="message" style="font-size: 1rem; opacity: 0.8">YOU REACHED LEVEL <span id="final-score">0</span></div>
+            <button class="btn" onclick="startGame()">RETRY</button>
+            <button class="btn btn-share" onclick="generateShareCard()">GET SHARE CARD</button>
+        </div>
+    </div>
+
+    <!-- Audio Elements (Simple Beeps) -->
+    <!-- Using Web Audio API in JS for no-asset dependency -->
+
+    <!-- Hidden Canvas for Share Image Generation -->
+    <canvas id="shareCanvas" width="600" height="400"></canvas>
+
+    <script>
+        // --- Game Config & State ---
+        const grid = document.getElementById('grid');
+        const levelDisplay = document.getElementById('level-count');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+
+        let sequence = [];
+        let playerSequence = [];
+        let level = 1;
+        let isPlaying = false;
+        let isPlayerTurn = false;
+
+        // --- Audio Context (Synth) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playTone(freq, type = 'sine', duration = 0.1) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        // --- Grid Generation ---
+        function createGrid() {
+            grid.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const tile = document.createElement('div');
+                tile.classList.add('tile');
+                tile.dataset.index = i;
+                tile.addEventListener('mousedown', () => handleInput(i));
+                tile.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Prevent delay on mobile
+                    handleInput(i);
+                });
+                grid.appendChild(tile);
+            }
+        }
+
+        // --- Game Logic ---
+        function startGame() {
+            sequence = [];
+            playerSequence = [];
+            level = 1;
+            isPlaying = true;
+            
+            levelDisplay.innerText = level;
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            
+            createGrid();
+            nextRound();
+        }
+
+        function nextRound() {
+            isPlayerTurn = false;
+            playerSequence = [];
+            levelDisplay.innerText = level;
+            
+            // Add new step
+            const nextStep = Math.floor(Math.random() * 9);
+            sequence.push(nextStep);
+
+            // Play sequence
+            let delay = 500;
+            sequence.forEach((index, i) => {
+                setTimeout(() => {
+                    flashTile(index);
+                }, delay);
+                delay += 600; // Speed of sequence
+            });
+
+            // Enable player input after sequence
+            setTimeout(() => {
+                isPlayerTurn = true;
+            }, delay);
+        }
+
+        function flashTile(index) {
+            const tiles = document.querySelectorAll('.tile');
+            const tile = tiles[index];
+            tile.classList.add('active');
+            
+            // Dynamic pitch based on index
+            playTone(200 + (index * 50), 'triangle'); 
+
+            setTimeout(() => {
+                tile.classList.remove('active');
+            }, 300);
+        }
+
+        function handleInput(index) {
+            if (!isPlaying || !isPlayerTurn) return;
+
+            const tiles = document.querySelectorAll('.tile');
+            const tile = tiles[index];
+
+            // Feedback
+            tile.classList.add('active');
+            playTone(200 + (index * 50), 'sine');
+            setTimeout(() => tile.classList.remove('active'), 150);
+
+            // Logic
+            playerSequence.push(index);
+            const currentStep = playerSequence.length - 1;
+
+            if (playerSequence[currentStep] !== sequence[currentStep]) {
+                gameOver();
+                return;
+            }
+
+            if (playerSequence.length === sequence.length) {
+                isPlayerTurn = false;
+                level++;
+                playTone(600, 'square', 0.2); // Success sound
+                setTimeout(nextRound, 1000);
+            }
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            const tiles = document.querySelectorAll('.tile');
+            
+            // Red flash
+            document.body.style.backgroundColor = '#3a0000';
+            setTimeout(() => document.body.style.backgroundColor = '#0f0f1a', 200);
+            
+            playTone(100, 'sawtooth', 0.5); // Error sound
+            
+            finalScoreDisplay.innerText = level;
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        // --- Share Card Generator ---
+        function generateShareCard() {
+            const canvas = document.getElementById('shareCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 1. Background
+            ctx.fillStyle = '#0f0f1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 2. Add some techy grid lines
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineWidth = 2;
+            for(let i=0; i<canvas.width; i+=40) {
+                ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            }
+            for(let i=0; i<canvas.height; i+=40) {
+                ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+
+            // 3. Border Glow
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(10, 10, canvas.width-20, canvas.height-20);
+
+            // 4. Text - Title
+            ctx.fillStyle = '#00f3ff';
+            ctx.font = 'bold 40px Courier New';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = "#00f3ff";
+            ctx.shadowBlur = 15;
+            ctx.fillText("PIXEL PULSE", canvas.width/2, 80);
+            
+            // 5. Text - Score
+            ctx.fillStyle = '#ff00ff';
+            ctx.font = 'bold 60px Courier New';
+            ctx.shadowColor = "#ff00ff";
+            ctx.shadowBlur = 15;
+            ctx.fillText(`LEVEL ${level}`, canvas.width/2, 200);
+
+            // 6. Text - CTA
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '20px Courier New';
+            ctx.shadowBlur = 0;
+            ctx.fillText("Can you beat my focus?", canvas.width/2, 280);
+            
+            // 7. Text - URL
+            ctx.fillStyle = '#00ff66';
+            ctx.font = 'bold 25px Courier New';
+            ctx.fillText("pixelpulse.netlify.app", canvas.width/2, 330);
+
+            // Convert to image and download
+            const image = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+            
+            // Create temporary link to trigger download
+            const link = document.createElement('a');
+            link.download = `pixel-pulse-level-${level}.png`;
+            link.href = image;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Initial Setup
+        createGrid();
+    </script>
+</body>
+</html>
+
+
