@@ -1,0 +1,21 @@
+{
+  "short_name": "Pixel Pulse",
+  "name": "Pixel Pulse: Focus Training",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0f0f1a",
+  "display": "standalone",
+  "scope": "./",
+  "theme_color": "#00f3ff",
+  "description": "Train your brain to focus. Beat the rot."
+  "orientation": "portrait"
+}
+
+
